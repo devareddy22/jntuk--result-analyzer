@@ -4,11 +4,11 @@ from analyzer import calculate_results, parse_pdf
 
 st.set_page_config(page_title="JNTUK Result Manager", layout="wide")
 
-# --- MAIN TITLE (RESTORED) ---
+# --- MAIN TITLE ---
 st.title("🎓 JNTUK Percentage Calculator")
 st.write("Upload your semester memos to calculate your CGPA.")
 
-# --- SIDEBAR: UPLOAD ONLY ---
+# --- SIDEBAR: UPLOAD ---
 with st.sidebar:
     st.header("Upload Center")
     uploaded_files = st.file_uploader("Upload Memos (PDF/CSV)", type=["csv", "pdf"], accept_multiple_files=True)
@@ -21,8 +21,8 @@ all_semesters_data = []
 if use_demo:
     # DEMO DATA
     data = {
-        'RollNo': ['22HJ1A4311']*6,
-        'StudentName': ['LEKKALA DIVAKAR REDDY']*6,
+        'RollNo': ['00000']*6,
+        'StudentName': ['Hidden']*6,
         'Semester': ['1-1', '1-1', '1-1', '1-2', '1-2', '2-1'],
         'Subject': ['Python', 'Maths-I', 'Physics', 'Data Structures', 'Maths-II', 'Java'],
         'Grade': ['B', 'A', 'F', 'S', 'B', 'F'],
@@ -52,8 +52,6 @@ if all_semesters_data:
     full_history.drop_duplicates(subset=['Subject'], keep='first', inplace=True)
     full_history.sort_values(by=['Semester', 'Subject'], inplace=True)
 
-    # --- STUDENT DETAILS (SHOWN BELOW TITLE) ---
-  
     st.divider()
 
     # --- SECTION A: FAILURES ---
@@ -76,8 +74,13 @@ if all_semesters_data:
             with tabs[i]:
                 sem_data = full_history[full_history['Semester'] == sem]
                 
-                # SGPA
-                sgpa = calculate_results(pd.DataFrame(sem_data)).iloc[0]['SGPA'] if not sem_data.empty else 0
+                # SGPA Calculation
+                if not sem_data.empty:
+                    res = calculate_results(pd.DataFrame(sem_data))
+                    sgpa = res.iloc[0]['SGPA']
+                else:
+                    sgpa = 0.0
+                
                 st.metric(f"SGPA ({sem})", sgpa)
                 
                 # Table
@@ -101,6 +104,33 @@ if all_semesters_data:
     c1.metric("Total Credits", total_creds)
     c2.metric("Total Semesters", len(semesters))
     c3.metric("🏆 FINAL CGPA", cgpa)
+
+    # --- SECTION D: VISUALIZATION (THE NEW PART) ---
+    st.divider()
+    st.subheader("📈 Performance Trend")
+
+    # Prepare Data for Graph
+    trend_data = []
+    for sem in semesters:
+        sem_df = full_history[full_history['Semester'] == sem]
+        if not sem_df.empty:
+            res = calculate_results(pd.DataFrame(sem_df))
+            sgpa_val = res.iloc[0]['SGPA']
+            trend_data.append({'Semester': sem, 'SGPA': sgpa_val})
+    
+    if trend_data:
+        trend_df = pd.DataFrame(trend_data)
+        st.line_chart(trend_df.set_index('Semester')['SGPA'])
+        
+        # Insight
+        if len(trend_df) > 1:
+            first = trend_df.iloc[0]['SGPA']
+            last = trend_df.iloc[-1]['SGPA']
+            diff = last - first
+            if diff > 0:
+                st.success(f"🚀 Improvement: +{diff:.2f} points since start!")
+            elif diff < 0:
+                st.warning(f"📉 Drop: {diff:.2f} points since start.")
 
 elif not use_demo:
     st.info("Upload files to begin.")
